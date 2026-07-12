@@ -365,18 +365,21 @@ function addFixtureToPatch(defId){
   const universe=state.patch.universe;
   const address=nextFreeAddress(universe, chCount);
   const existingCount=state.patch.fixtures.filter(f=>f.defId===defId).length;
+  const posIndex = state.patch.fixtures.length;
   const fixture={
     id:state.patch.nextId++, defId, modeIndex, universe, address,
-    name:`${def.name} ${existingCount+1}`, hue:def.hue,
+    name:`${def.name} ${existingCount+1}`, hue:def.hue, posX: (posIndex%9-4)*0.9,
   };
   state.patch.fixtures.push(fixture);
-  renderPatchTable(); renderTimeline();
+  state.ui.selectedFixtureId = fixture.id;
+  renderPatchTable(); renderTimeline(); rebuild3DFixtures(); renderSidebar();
   return fixture;
 }
 function removeFixture(id){
   state.patch.fixtures=state.patch.fixtures.filter(f=>f.id!==id);
   state.clips.list=state.clips.list.filter(c=>c.fixtureId!==id);
-  renderPatchTable(); renderTimeline();
+  if(state.ui.selectedFixtureId===id) state.ui.selectedFixtureId=null;
+  renderPatchTable(); renderTimeline(); rebuild3DFixtures(); renderSidebar();
 }
 function fixtureChannelSpan(f){
   const def=getFixtureDef(f.defId);
@@ -538,8 +541,9 @@ function renderTopbar(skipStructure){
     el.innerHTML = `
       <div class="brand"><img src="logo.png" alt="" id="brand-logo" onerror="this.style.display='none';document.getElementById('brand-mark-fallback').style.display='inline-block';" style="width:20px;height:20px;object-fit:contain;border-radius:4px;"><span class="mark" id="brand-mark-fallback" style="display:none;"></span><b>LUMEN</b></div>
       <div class="transport">
-        <button id="btn-stop" title="Stop">${svgStop()}</button>
-        <button id="btn-play" class="play" title="Lecture">${svgPlay()}</button>
+        <button id="btn-stop" title="Stop [S]">${svgStop()}</button>
+        <button id="btn-play" class="play" title="Lecture / Pause [Espace]">${svgPlay()}</button>
+        <button id="btn-help" title="Raccourcis clavier :&#10;Espace — Lecture/Pause&#10;S — Stop&#10;← / → — Reculer/Avancer 1s (Maj = 5s)&#10;+ / − — Zoom timeline&#10;Suppr — Supprimer le clip sélectionné&#10;B — Blackout&#10;Échap — Fermer/Désélectionner" style="font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:6px;width:30px;height:30px;">?</button>
       </div>
       <div class="timecode" id="timecode">00:00.00</div>
       <div class="bpm-mini">
@@ -689,7 +693,7 @@ function drawRulerAndRows(){
   let html = `<div class="track-row"><div class="track-head"><span class="color-dot" style="background:var(--cyan)"></span><span class="tname">🎵 Audio</span></div><div class="track-lane master" data-role="master"><canvas id="waveform-canvas"></canvas></div></div>`;
   fixtures.forEach(f=>{
     html += `<div class="track-row" data-fixture-track="${f.id}">
-      <div class="track-head"><span class="color-dot" style="background:hsl(${f.hue} 70% 55%)"></span><span class="tname">${f.name}</span>
+      <div class="track-head" data-select-fixture="${f.id}" style="cursor:pointer;"><span class="color-dot" style="background:hsl(${f.hue} 70% 55%)"></span><span class="tname">${f.name}</span>
         <button class="ms-btn" data-ms="mute" data-id="${f.id}" style="margin-left:auto;font-size:8.5px;padding:1px 4px;border-radius:3px;border:1px solid var(--line);color:${f.muted?'#fff':'var(--muted)'};background:${f.muted?'var(--red)':'transparent'};">M</button>
         <button class="ms-btn" data-ms="solo" data-id="${f.id}" style="font-size:8.5px;padding:1px 4px;border-radius:3px;border:1px solid var(--line);color:${f.solo?'#1a1200':'var(--muted)'};background:${f.solo?'var(--amber)':'transparent'};">S</button>
       </div>
@@ -709,6 +713,9 @@ function drawRulerAndRows(){
       drawRulerAndRows();
     });
   });
+  rows.querySelectorAll('[data-select-fixture]').forEach(head=>{
+    head.addEventListener('click',()=> selectFixture(+head.dataset.selectFixture));
+  });
 
   // clips
   fixtures.forEach(f=>{
@@ -723,7 +730,7 @@ function drawRulerAndRows(){
       div.style.background=`hsl(${f.hue} 65% 55%)`;
       div.textContent = clip.effect==='static'||clip.effect==='static_color' ? f.name : `${f.name} · ${effectLabel(clip.effect)}`;
       div.dataset.clipId = clip.id;
-      div.addEventListener('click',(e)=>{ e.stopPropagation(); state.clips.selectedId=clip.id; openTool('anim'); drawRulerAndRows(); renderAnimPanel(); });
+      div.addEventListener('click',(e)=>{ e.stopPropagation(); state.clips.selectedId=clip.id; state.ui.selectedFixtureId=f.id; openTool('anim'); drawRulerAndRows(); renderAnimPanel(); renderSidebar(); });
       const hl=document.createElement('div'); hl.className='handle l';
       const hr=document.createElement('div'); hr.className='handle r';
       div.appendChild(hl); div.appendChild(hr);
@@ -987,13 +994,17 @@ function renderFixtureList(){
   });
   if(items.length===0){ list.innerHTML=`<div style="grid-column:1/-1;color:var(--muted-2);font-size:11px;padding:14px;">Aucune fixture trouvée</div>`; return; }
   list.innerHTML = items.map(f=>`
-    <div class="fixture-card" draggable="true" data-def="${f.id}">
+    <div class="fixture-card" data-def="${f.id}">
+      <button class="add-fixture-btn" data-def="${f.id}" title="Ajouter au patch">+</button>
       <div class="brand-tag">${f.brand}</div>
       <div class="name">${f.name}</div>
       <div class="meta"><span>${f.modes.length} mode${f.modes.length>1?'s':''}</span></div>
     </div>`).join('');
+  list.querySelectorAll('.add-fixture-btn').forEach(btn=>{
+    btn.addEventListener('click',(e)=>{ e.stopPropagation(); addFixtureToPatch(btn.dataset.def); renderPatchTable(); });
+  });
   list.querySelectorAll('.fixture-card').forEach(card=>{
-    card.addEventListener('dblclick', ()=>{ addFixtureToPatch(card.dataset.def); renderPatchTable(); });
+    card.addEventListener('click', ()=>{ addFixtureToPatch(card.dataset.def); renderPatchTable(); });
   });
 }
 function renderPatchTable(){
@@ -1007,7 +1018,7 @@ function renderPatchTable(){
   wrap.innerHTML = `<table class="patch-table"><thead><tr><th>Nom</th><th>Uni.</th><th>Adr.</th><th>Mode</th><th>Ch.</th><th></th></tr></thead><tbody>
     ${state.patch.fixtures.map(f=>{
       const def=getFixtureDef(f.defId); const span=fixtureChannelSpan(f);
-      return `<tr class="${conflicts.has(f.id)?'conflict':''}">
+      return `<tr class="${conflicts.has(f.id)?'conflict':''}" data-fixture-row="${f.id}" style="cursor:pointer;">
         <td><span class="color-dot" style="background:hsl(${f.hue} 70% 55%);display:inline-block;margin-right:4px;"></span>${f.name}</td>
         <td><input type="number" min="1" max="8" class="universe-input" data-id="${f.id}" value="${f.universe}"></td>
         <td><input type="number" min="1" max="512" class="address-input" data-id="${f.id}" value="${f.address}"></td>
@@ -1017,6 +1028,12 @@ function renderPatchTable(){
       </tr>`;
     }).join('')}
   </tbody></table>`;
+  wrap.querySelectorAll('[data-fixture-row]').forEach(tr=>{
+    tr.addEventListener('click',(e)=>{
+      if(['INPUT','SELECT','BUTTON'].includes(e.target.tagName)) return;
+      selectFixture(+tr.dataset.fixtureRow);
+    });
+  });
   wrap.querySelectorAll('.universe-input').forEach(inp=>inp.addEventListener('change',e=>{ const f=state.patch.fixtures.find(x=>x.id===+e.target.dataset.id); f.universe=clamp(+e.target.value||1,1,8); renderPatchTable(); renderTimeline(); }));
   wrap.querySelectorAll('.address-input').forEach(inp=>inp.addEventListener('change',e=>{ const f=state.patch.fixtures.find(x=>x.id===+e.target.dataset.id); f.address=clamp(+e.target.value||1,1,512); renderPatchTable(); }));
   wrap.querySelectorAll('.mode-select').forEach(sel=>sel.addEventListener('change',e=>{ const f=state.patch.fixtures.find(x=>x.id===+e.target.dataset.id); f.modeIndex=+e.target.value; renderPatchTable(); }));
@@ -1159,18 +1176,64 @@ function init3DPreview(){
   state.three.truss = truss;
   updateCamera();
 
-  // orbit manuel (drag souris)
-  let dragging=false, lastX=0, lastY=0;
+  // interaction souris : clic sur une fixture = sélection, drag = déplacement le long du truss,
+  // drag ailleurs = orbite de la caméra
+  const raycaster = new THREE.Raycaster();
+  const mouseNDC = new THREE.Vector2();
+  const dragPlane = new THREE.Plane(new THREE.Vector3(0,1,0), -3); // plan horizontal à hauteur du truss
+  let mode=null; // null | 'orbit' | 'move'
+  let lastX=0, lastY=0, movedDist=0, draggedFixtureId=null;
   const dom = renderer.domElement;
-  dom.addEventListener('mousedown', e=>{ dragging=true; lastX=e.clientX; lastY=e.clientY; });
-  window.addEventListener('mouseup', ()=> dragging=false);
+
+  function pickFixtureAt(clientX, clientY){
+    const rect = dom.getBoundingClientRect();
+    mouseNDC.x = ((clientX-rect.left)/rect.width)*2-1;
+    mouseNDC.y = -((clientY-rect.top)/rect.height)*2+1;
+    raycaster.setFromCamera(mouseNDC, camera);
+    const groups = Object.values(state.three.meshes).map(m=>m.group);
+    const hits = raycaster.intersectObjects(groups, true);
+    if(hits.length===0) return null;
+    let obj = hits[0].object;
+    while(obj && obj.userData.fixtureId==null) obj = obj.parent;
+    return obj ? obj.userData.fixtureId : null;
+  }
+
+  dom.addEventListener('mousedown', e=>{
+    lastX=e.clientX; lastY=e.clientY; movedDist=0;
+    const hitId = pickFixtureAt(e.clientX, e.clientY);
+    if(hitId!=null){ mode='move'; draggedFixtureId=hitId; }
+    else { mode='orbit'; }
+  });
+  window.addEventListener('mouseup', e=>{
+    if(mode==='move' && movedDist<4 && draggedFixtureId!=null){
+      selectFixture(draggedFixtureId); // simple clic (peu de mouvement) = sélection
+    }
+    mode=null; draggedFixtureId=null;
+  });
   window.addEventListener('mousemove', e=>{
-    if(!dragging) return;
+    if(!mode) return;
     const dx=e.clientX-lastX, dy=e.clientY-lastY;
+    movedDist += Math.abs(dx)+Math.abs(dy);
     lastX=e.clientX; lastY=e.clientY;
-    state.three.orbit.az -= dx*0.008;
-    state.three.orbit.el = clamp(state.three.orbit.el - dy*0.006, 0.15, 1.4);
-    updateCamera();
+    if(mode==='orbit'){
+      state.three.orbit.az -= dx*0.008;
+      state.three.orbit.el = clamp(state.three.orbit.el - dy*0.006, 0.15, 1.4);
+      updateCamera();
+    } else if(mode==='move' && draggedFixtureId!=null){
+      const rect = dom.getBoundingClientRect();
+      mouseNDC.x = ((e.clientX-rect.left)/rect.width)*2-1;
+      mouseNDC.y = -((e.clientY-rect.top)/rect.height)*2+1;
+      raycaster.setFromCamera(mouseNDC, camera);
+      const pt = new THREE.Vector3();
+      if(raycaster.ray.intersectPlane(dragPlane, pt)){
+        const f = state.patch.fixtures.find(x=>x.id===draggedFixtureId);
+        if(f){
+          f.posX = clamp(pt.x, -5.5, 5.5);
+          const mesh = state.three.meshes[f.id];
+          if(mesh) mesh.group.position.x = f.posX;
+        }
+      }
+    }
   });
   dom.addEventListener('wheel', e=>{
     e.preventDefault();
@@ -1203,9 +1266,11 @@ function rebuild3DFixtures(){
   const n = fixtures.length;
   fixtures.forEach((f,i)=>{
     const def = getFixtureDef(f.defId);
-    const x = n>1 ? (i/(n-1)-0.5)*8.5 : 0;
+    const defaultX = n>1 ? (i/(n-1)-0.5)*8.5 : 0;
+    if(f.posX==null) f.posX = defaultX;
     const group = new THREE.Group();
-    group.position.set(x, 3, 0);
+    group.position.set(f.posX, 3, 0);
+    group.userData.fixtureId = f.id;
 
     const bodyColor = 0x2a2e35;
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.35,0.3,0.35), new THREE.MeshBasicMaterial({color:bodyColor}));
@@ -1266,6 +1331,7 @@ function update3DPreview(){
     const audible = !state.mixer.blackout && !f.muted && (!anySolo || f.solo);
     const masterFactor = audible ? clamp(state.mixer.masterDimmer/100,0,1) : 0;
     const dimAlpha = clamp((val.dimmer??100)/100, 0, 1) * masterFactor;
+    if(mesh.body) mesh.body.material.color.set(f.id===state.ui.selectedFixtureId ? 0xf5a623 : 0x2a2e35);
 
     if(mesh.kind==='pantilt'){
       const panRad = ((val.pan-50)/50) * (Math.PI*0.75);
@@ -1368,12 +1434,153 @@ function init(){
   renderTopbar();
   renderTimeline();
   renderToolbar();
+  renderSidebar();
   init3DPreview();
+  setupKeyboardShortcuts();
   const scrollEl = document.getElementById('tracks-scroll');
   if(scrollEl) scrollEl.addEventListener('scroll', ()=>{
     document.getElementById('ruler-canvas').style.transform = `translateX(0)`;
   });
   update3DPreview();
 }
+
+// ============================================================
+// RACCOURCIS CLAVIER
+// ============================================================
+function setupKeyboardShortcuts(){
+  document.addEventListener('keydown', (e)=>{
+    const tag = (e.target.tagName||'').toLowerCase();
+    if(tag==='input' || tag==='select' || tag==='textarea') return; // ne pas interférer avec la saisie
+    switch(e.code){
+      case 'Space':
+        e.preventDefault();
+        state.audio.isPlaying ? pauseAudio() : playAudio();
+        break;
+      case 'Escape':
+        openTool(null);
+        state.ui.selectedFixtureId=null; renderSidebar();
+        state.clips.selectedId=null; drawRulerAndRows();
+        break;
+      case 'Delete': case 'Backspace':
+        if(state.clips.selectedId){ e.preventDefault(); removeClip(state.clips.selectedId); drawRulerAndRows(); if(state.ui.activeTool==='anim') renderSlidingPanel(); }
+        break;
+      case 'KeyB':
+        document.getElementById('btn-blackout')?.click();
+        break;
+      case 'ArrowRight':
+        seekTo(currentPlayhead() + (e.shiftKey?5:1));
+        break;
+      case 'ArrowLeft':
+        seekTo(currentPlayhead() - (e.shiftKey?5:1));
+        break;
+      case 'Equal': case 'NumpadAdd':
+        setZoom(state.timeline.pxPerSecond*1.3);
+        break;
+      case 'Minus': case 'NumpadSubtract':
+        setZoom(state.timeline.pxPerSecond/1.3);
+        break;
+      case 'KeyS':
+        stopAudio();
+        break;
+      default: break;
+    }
+  });
+}
 document.addEventListener('DOMContentLoaded', init);
 if(document.readyState!=='loading') init();
+
+// ============================================================
+// SÉLECTION DE FIXTURE + PANNEAU PROPRIÉTÉS (gauche)
+// ============================================================
+function selectFixture(id){
+  state.ui.selectedFixtureId = id;
+  renderSidebar();
+  renderPatchTable();
+  drawRulerAndRows();
+}
+
+// Trouve (ou crée) le clip couvrant l'instant courant pour une fixture,
+// afin que les faders du panneau propriétés puissent éditer/créer une valeur en direct.
+function getOrCreateClipAtPlayhead(fixtureId){
+  const pos = currentPlayhead();
+  let clip = state.clips.list.find(c=>c.fixtureId===fixtureId && pos>=c.start && pos<=c.end);
+  if(clip) return clip;
+  const bpm = state.audio.bpm || 120;
+  const dur = state.audio.buffer ? (60/bpm)*4 : 4;
+  clip = addClip(fixtureId, pos, dur);
+  drawRulerAndRows();
+  return clip;
+}
+
+function renderSidebar(){
+  const el = document.getElementById('sidebar');
+  const fid = state.ui.selectedFixtureId;
+  const fixture = state.patch.fixtures.find(f=>f.id===fid);
+  if(!fixture){
+    el.innerHTML = `<div class="panel-header"><h3>PROPRIÉTÉS</h3></div>
+      <div style="padding:18px;color:var(--muted-2);font-size:11.5px;line-height:1.6;">
+        Sélectionne une fixture — depuis la bibliothèque, la liste de patch, une piste de la timeline, ou directement dans l'aperçu 3D — pour accéder à ses faders ici.
+      </div>`;
+    return;
+  }
+  const def = getFixtureDef(fixture.defId);
+  const mode = def.modes[fixture.modeIndex];
+  const pos = currentPlayhead();
+  const activeClip = state.clips.list.find(c=>c.fixtureId===fixture.id && pos>=c.start && pos<=c.end);
+  const val = activeClip ? evalClipAt(activeClip, pos-activeClip.start) : {dimmer:100, colorHue:fixture.hue, pan:50, tilt:50};
+
+  el.innerHTML = `
+    <div class="panel-header"><h3>PROPRIÉTÉS</h3><button id="deselect-fixture">✕</button></div>
+    <div style="padding:14px;display:flex;flex-direction:column;gap:12px;">
+      <div>
+        <input type="text" id="prop-name" value="${fixture.name}" style="width:100%;font-size:13px;font-weight:700;padding:6px 8px;">
+        <div style="font-size:10px;color:var(--muted);margin-top:4px;">${def.brand} · ${def.name}</div>
+      </div>
+      <div class="insp-section" style="border:1px solid var(--line);border-radius:8px;padding:10px;">
+        <h4 style="font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px;">PATCH</h4>
+        <div class="field-row"><label>Univers</label><input type="number" id="prop-universe" min="1" max="8" value="${fixture.universe}" style="width:56px;"></div>
+        <div class="field-row"><label>Adresse</label><input type="number" id="prop-address" min="1" max="512" value="${fixture.address}" style="width:56px;"></div>
+        <div class="field-row"><label>Mode</label><select id="prop-mode" style="flex:1;">${def.modes.map((m,i)=>`<option value="${i}" ${i===fixture.modeIndex?'selected':''}>${m.name}</option>`).join('')}</select></div>
+      </div>
+      <div class="insp-section" style="border:1px solid var(--line);border-radius:8px;padding:10px;">
+        <h4 style="font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px;">FADERS EN DIRECT (à ${fmtTime(pos)})</h4>
+        ${isPanTiltFixture(def) ? `
+        <div class="field-row"><label>Pan</label><input type="range" id="fader-pan" min="0" max="100" value="${Math.round(val.pan??50)}"><span class="val" id="fader-pan-val">${Math.round(val.pan??50)}</span></div>
+        <div class="field-row"><label>Tilt</label><input type="range" id="fader-tilt" min="0" max="100" value="${Math.round(val.tilt??50)}"><span class="val" id="fader-tilt-val">${Math.round(val.tilt??50)}</span></div>
+        ` : ''}
+        <div class="field-row"><label>Dimmer</label><input type="range" id="fader-dimmer" min="0" max="100" value="${Math.round(val.dimmer??100)}"><span class="val" id="fader-dimmer-val">${Math.round(val.dimmer??100)}%</span></div>
+        <div class="field-row"><label>Couleur</label><input type="color" id="fader-color" value="${hueToHex(val.colorHue??fixture.hue)}"></div>
+        <div style="font-size:9.5px;color:var(--muted);margin-top:6px;line-height:1.5;">${activeClip? 'Modifie le keyframe le plus proche du curseur.' : 'Aucun clip ici — bouger un fader en créera un automatiquement.'}</div>
+      </div>
+      <div class="insp-section" style="border:1px solid var(--line);border-radius:8px;padding:10px;">
+        <h4 style="font-size:9px;letter-spacing:1.5px;color:var(--muted);margin-bottom:8px;">MAPPING DES CANAUX (${mode.channels.length})</h4>
+        <div class="channel-map" style="max-height:160px;overflow-y:auto;">
+          ${mode.channels.map((ch,i)=>`<div class="channel-row"><span class="ch-num">${fixture.address+i}</span><span class="ch-name">${ch}</span></div>`).join('')}
+        </div>
+      </div>
+      <button class="del-btn" id="prop-delete" style="border:1px solid var(--line);border-radius:6px;padding:7px;">✕ Retirer cette fixture du patch</button>
+    </div>
+  `;
+  document.getElementById('deselect-fixture').onclick=()=>{ state.ui.selectedFixtureId=null; renderSidebar(); };
+  document.getElementById('prop-name').onchange=(e)=>{ fixture.name=e.target.value||fixture.name; renderPatchTable(); drawRulerAndRows(); };
+  document.getElementById('prop-universe').onchange=(e)=>{ fixture.universe=clamp(+e.target.value||1,1,8); renderPatchTable(); };
+  document.getElementById('prop-address').onchange=(e)=>{ fixture.address=clamp(+e.target.value||1,1,512); renderPatchTable(); renderSidebar(); };
+  document.getElementById('prop-mode').onchange=(e)=>{ fixture.modeIndex=+e.target.value; renderPatchTable(); renderSidebar(); };
+  document.getElementById('prop-delete').onclick=()=>removeFixture(fixture.id);
+
+  const panEl=document.getElementById('fader-pan'), tiltEl=document.getElementById('fader-tilt'),
+        dimEl=document.getElementById('fader-dimmer'), colorEl=document.getElementById('fader-color');
+  function applyLiveFader(){
+    const clip = getOrCreateClipAtPlayhead(fixture.id);
+    const localT = clamp(pos-clip.start, 0, clip.end-clip.start);
+    const values = { dimmer: dimEl?+dimEl.value:100, colorHue: colorEl?hexToHue(colorEl.value):fixture.hue };
+    if(panEl) values.pan=+panEl.value;
+    if(tiltEl) values.tilt=+tiltEl.value;
+    addKeyframeToClip(clip.id, localT, values);
+    update3DPreview();
+  }
+  if(panEl) panEl.oninput=(e)=>{ document.getElementById('fader-pan-val').textContent=e.target.value; applyLiveFader(); };
+  if(tiltEl) tiltEl.oninput=(e)=>{ document.getElementById('fader-tilt-val').textContent=e.target.value; applyLiveFader(); };
+  if(dimEl) dimEl.oninput=(e)=>{ document.getElementById('fader-dimmer-val').textContent=e.target.value+'%'; applyLiveFader(); };
+  if(colorEl) colorEl.oninput=applyLiveFader;
+}
