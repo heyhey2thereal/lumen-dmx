@@ -12,6 +12,7 @@ const state = {
   timeline:{ pxPerSecond:60, snapToBeat:true },
   library:{ search:'', category:'all' },
   patch:{ fixtures:[], nextId:1, universe:1 },
+  mixer:{ masterDimmer:100, blackout:false },
   clips:{ list:[], nextId:1, selectedId:null },
   ui:{ activeTool:null, selectedFixtureForInspector:null },
   three:{ renderer:null, scene:null, camera:null, meshes:{}, orbit:{az:0.6, el:0.55, dist:9} },
@@ -278,6 +279,46 @@ const FIXTURE_LIBRARY = [
   { id:'jb-varyscan', name:'Varyscan P9', brand:'JB-Lighting', category:'spot', hue:280,
     modes:[{name:'Standard (24ch)', channels:['Pan','Pan Fine','Tilt','Tilt Fine','Vitesse PT','Dimmer','Strobe','CMY Cyan','CMY Magenta','CMY Jaune','CTO','Gobo Fixe','Gobo Rotatif','Rotation Gobo','Prisme','Focus','Zoom','Zoom Fine','Frost','Iris','Animation','Macro','Programme','Reset']}]},
 
+  // ---- AYRTON ----
+  { id:'ayrton-perfo', name:'Perfo S', brand:'Ayrton', category:'beam', hue:330,
+    modes:[{name:'Standard (26ch)', channels:['Pan','Pan Fine','Tilt','Tilt Fine','Vitesse PT','Dimmer','Strobe','Couleur','Couleur Fine','CTO','Gobo','Rotation Gobo','Prisme 1','Prisme 2','Focus','Zoom','Zoom Fine','Frost','Iris','Animation','Vitesse Animation','Macro','Vitesse Macro','Effet Pixel','Programme','Reset']}]},
+  { id:'ayrton-diablo', name:'Diablo', brand:'Ayrton', category:'wash', hue:150,
+    modes:[{name:'Standard (22ch)', channels:['Pan','Pan Fine','Tilt','Tilt Fine','Vitesse PT','Dimmer','Strobe','Rouge','Vert','Bleu','Blanc','CTO','Zoom','Zoom Fine','Effet Pixel','Vitesse Effet','Frost','Macro','Vitesse Macro','Programme','Groupe Pixel','Reset']}]},
+
+  // ---- VARI-LITE ----
+  { id:'varilite-vl3500', name:'VL3500 Spot', brand:'Vari-Lite', category:'spot', hue:280,
+    modes:[{name:'Standard (28ch)', channels:['Pan','Pan Fine','Tilt','Tilt Fine','Vitesse PT','Dimmer','Strobe','CMY Cyan','CMY Magenta','CMY Jaune','CTO','Gobo Fixe','Gobo Rotatif','Rotation Gobo','Prisme','Rotation Prisme','Iris','Iris Vitesse','Focus','Zoom','Zoom Fine','Frost','Animation','Macro','Vitesse Macro','Dimmer Fine','Programme','Reset']}]},
+
+  // ---- HIGH END SYSTEMS ----
+  { id:'hes-shapeshifter', name:'SHAPESHIFTER', brand:'High End Systems', category:'wash', hue:150,
+    modes:[{name:'Standard (30ch)', channels:['Pan','Pan Fine','Tilt','Tilt Fine','Vitesse PT','Dimmer','Strobe','Rouge','Vert','Bleu','Blanc','Ambre','UV','Zoom','Zoom Fine','Effet Pixel 1','Effet Pixel 2','Vitesse Effet','Frost','Macro','Vitesse Macro','Groupe','Rotation Tete','Programme','Reset','Fan','Config1','Config2','Config3','Config4']}]},
+
+  // ---- SGM ----
+  { id:'sgm-p6', name:'P-6 Strobe/Blinder', brand:'SGM', category:'strobe', hue:0,
+    modes:[{name:'8ch', channels:['Dimmer','Strobe','Vitesse Strobe','Rouge','Vert','Bleu','Blanc','Programme']}]},
+
+  // ---- CHROMA-Q ----
+  { id:'chromaq-color-force', name:'Color Force II 72', brand:'Chroma-Q', category:'bar', hue:20,
+    modes:[{name:'8ch RGBAL+Dimmer', channels:['Dimmer','Rouge','Vert','Bleu','Ambre','Lime','Strobe','Programme']}]},
+
+  // ---- ASTERA ----
+  { id:'astera-titan-tube', name:'Titan Tube (sans fil)', brand:'Astera', category:'bar', hue:20,
+    modes:[{name:'8ch RGBMA+Dimmer', channels:['Dimmer','Rouge','Vert','Bleu','Blanc Chaud','Blanc Froid','Ambre','Menthe','Strobe']}]},
+
+  // ---- CAMEO ----
+  { id:'cameo-opus-sp5', name:'OPUS SP5', brand:'Cameo', category:'spot', hue:280,
+    modes:[{name:'Standard (20ch)', channels:['Pan','Pan Fine','Tilt','Tilt Fine','Vitesse PT','Dimmer','Strobe','Couleur','Gobo Fixe','Gobo Rotatif','Rotation Gobo','Prisme','Focus','Zoom','Frost','Iris','Animation','Macro','Programme','Reset']}]},
+
+  // ---- SHOWTEC ----
+  { id:'showtec-phantom-140', name:'Phantom 140 LED Spot', brand:'Showtec', category:'spot', hue:280,
+    modes:[{name:'Standard (18ch)', channels:['Pan','Pan Fine','Tilt','Tilt Fine','Vitesse PT','Dimmer','Strobe','Couleur','Gobo','Rotation Gobo','Prisme','Focus','Zoom','Frost','Macro','Vitesse Macro','Programme','Reset']}]},
+
+  // ---- MACHINES À BROUILLARD SPÉCIALISÉES ----
+  { id:'looksolutions-unique2', name:'Unique 2.1 (hazer)', brand:'Look Solutions', category:'fog', hue:190,
+    modes:[{name:'3ch', channels:['Sortie Haze','Ventilateur','Vitesse Pompe']}]},
+  { id:'mdg-atmeq', name:'ATMe (hazer)', brand:'MDG', category:'fog', hue:190,
+    modes:[{name:'2ch', channels:['Sortie Haze','Ventilateur']}]},
+
   // ---- EFFETS DIVERS ----
   { id:'fog-machine', name:'Machine à fumée', brand:'Générique', category:'fog', hue:190,
     modes:[{name:'2ch Timer', channels:['Sortie Fumée','Minuteur']}]},
@@ -507,6 +548,12 @@ function renderTopbar(skipStructure){
         <button id="btn-tap">TAP</button>
       </div>
       <span class="track-name-mini" id="track-name">Aucun fichier</span>
+      <div class="bpm-mini" style="gap:6px;">
+        <span style="color:var(--muted);font-size:9.5px;letter-spacing:1px;">MASTER</span>
+        <input type="range" id="master-dimmer" min="0" max="100" value="${state.mixer.masterDimmer}" style="width:60px;">
+        <span id="master-dimmer-val" style="font-family:var(--font-mono);font-size:10.5px;color:var(--amber);width:28px;">${state.mixer.masterDimmer}%</span>
+      </div>
+      <button id="btn-blackout" title="Blackout général" style="background:${state.mixer.blackout?'var(--red)':'var(--panel-2)'};color:${state.mixer.blackout?'#fff':'var(--muted)'};border:1px solid var(--line);border-radius:7px;padding:8px 12px;font-size:11px;font-weight:700;letter-spacing:.5px;">BLACKOUT</button>
       <div class="spacer"></div>
       <label class="import-btn" for="audio-file-input">${svgImport()} Audio</label>
       <input type="file" id="audio-file-input" accept="audio/*" style="display:none">
@@ -517,6 +564,7 @@ function renderTopbar(skipStructure){
           <hr>
           <button class="item" id="exp-mydmx"><span class="t">MyDMX 3.0</span><span class="d">Export XML de patch + scènes</span><span class="badge">BEST-EFFORT</span></button>
           <button class="item" id="exp-grandma"><span class="t">grandMA showfile</span><span class="d">Export XML de patch + cues</span><span class="badge">BEST-EFFORT</span></button>
+          <button class="item" id="exp-csv"><span class="t">Feuille de patch (.csv)</span><span class="d">Nom, univers, adresse, mode, canaux</span></button>
           <hr>
           <button class="item" id="exp-load"><span class="t">Charger un projet...</span><span class="d">Importer un .json LUMEN</span></button>
           <input type="file" id="proj-file-input" accept="application/json" style="display:none">
@@ -527,6 +575,15 @@ function renderTopbar(skipStructure){
     document.getElementById('btn-stop').onclick=stopAudio;
     document.getElementById('btn-tap').onclick=tapTempo;
     document.getElementById('bpm-input').onchange=(e)=>{ setManualBpm(parseFloat(e.target.value)); };
+    document.getElementById('master-dimmer').oninput=(e)=>{
+      state.mixer.masterDimmer=+e.target.value;
+      document.getElementById('master-dimmer-val').textContent=e.target.value+'%';
+    };
+    document.getElementById('btn-blackout').onclick=(e)=>{
+      state.mixer.blackout=!state.mixer.blackout;
+      e.target.style.background = state.mixer.blackout?'var(--red)':'var(--panel-2)';
+      e.target.style.color = state.mixer.blackout?'#fff':'var(--muted)';
+    };
     document.getElementById('audio-file-input').onchange=(e)=>{ const f=e.target.files[0]; if(f) importAudioFile(f); };
     const dd = document.getElementById('export-dropdown');
     document.getElementById('export-toggle').onclick=(e)=>{ e.stopPropagation(); dd.classList.toggle('open'); };
@@ -534,6 +591,7 @@ function renderTopbar(skipStructure){
     document.getElementById('exp-json').onclick=exportProjectJSON;
     document.getElementById('exp-mydmx').onclick=exportMyDMX;
     document.getElementById('exp-grandma').onclick=exportGrandMA;
+    document.getElementById('exp-csv').onclick=exportPatchCSV;
     document.getElementById('exp-load').onclick=()=>document.getElementById('proj-file-input').click();
     document.getElementById('proj-file-input').onchange=(e)=>{ const f=e.target.files[0]; if(f) importProject(f); };
   }
@@ -631,7 +689,10 @@ function drawRulerAndRows(){
   let html = `<div class="track-row"><div class="track-head"><span class="color-dot" style="background:var(--cyan)"></span><span class="tname">🎵 Audio</span></div><div class="track-lane master" data-role="master"><canvas id="waveform-canvas"></canvas></div></div>`;
   fixtures.forEach(f=>{
     html += `<div class="track-row" data-fixture-track="${f.id}">
-      <div class="track-head"><span class="color-dot" style="background:hsl(${f.hue} 70% 55%)"></span><span class="tname">${f.name}</span></div>
+      <div class="track-head"><span class="color-dot" style="background:hsl(${f.hue} 70% 55%)"></span><span class="tname">${f.name}</span>
+        <button class="ms-btn" data-ms="mute" data-id="${f.id}" style="margin-left:auto;font-size:8.5px;padding:1px 4px;border-radius:3px;border:1px solid var(--line);color:${f.muted?'#fff':'var(--muted)'};background:${f.muted?'var(--red)':'transparent'};">M</button>
+        <button class="ms-btn" data-ms="solo" data-id="${f.id}" style="font-size:8.5px;padding:1px 4px;border-radius:3px;border:1px solid var(--line);color:${f.solo?'#1a1200':'var(--muted)'};background:${f.solo?'var(--amber)':'transparent'};">S</button>
+      </div>
       <div class="track-lane" data-fixture-lane="${f.id}"></div>
     </div>`;
   });
@@ -640,6 +701,14 @@ function drawRulerAndRows(){
   }
   rows.innerHTML = html;
   drawWaveformTrack(width);
+  rows.querySelectorAll('.ms-btn').forEach(btn=>{
+    btn.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      const f = state.patch.fixtures.find(x=>x.id===+btn.dataset.id);
+      if(btn.dataset.ms==='mute') f.muted=!f.muted; else f.solo=!f.solo;
+      drawRulerAndRows();
+    });
+  });
 
   // clips
   fixtures.forEach(f=>{
@@ -984,6 +1053,7 @@ function renderAnimPanelFull(panel){
       <div class="field-row"><label>Dimmer</label><input type="range" id="kf-dimmer" min="0" max="100" value="${Math.round(val.dimmer??100)}"><span class="val" id="kf-dimmer-val">${Math.round(val.dimmer??100)}%</span></div>
       <div class="field-row"><label>Couleur</label><input type="color" id="kf-color" value="${hueToHex(val.colorHue??fixture.hue)}"></div>
       <button class="add-kf-btn" id="add-kf-btn">+ Ajouter un keyframe à ${fmtTime(currentPlayhead())}</button>
+      <button class="add-kf-btn" id="dup-clip-btn" style="background:var(--panel-2);color:var(--text);border:1px solid var(--line);">⧉ Dupliquer ce clip après</button>
       <button class="del-btn" id="del-clip-btn" style="align-self:flex-start;">✕ Supprimer ce clip</button>
     </div>
     <div>
@@ -996,6 +1066,14 @@ function renderAnimPanelFull(panel){
 
   document.getElementById('clip-effect').onchange=(e)=>{ clip.effect=e.target.value; drawRulerAndRows(); renderAnimPanelFull(panel); };
   document.getElementById('del-clip-btn').onclick=()=>{ removeClip(clip.id); drawRulerAndRows(); renderAnimPanelFull(panel); };
+  document.getElementById('dup-clip-btn').onclick=()=>{
+    const dur = clip.end-clip.start;
+    const newClip = { id: state.clips.nextId++, fixtureId: clip.fixtureId, start: clip.end, end: clip.end+dur,
+      effect: clip.effect, keyframes: clip.keyframes.map(k=>({...k})) };
+    state.clips.list.push(newClip);
+    state.clips.selectedId = newClip.id;
+    drawRulerAndRows(); renderAnimPanelFull(panel);
+  };
   const panEl=document.getElementById('kf-pan'), tiltEl=document.getElementById('kf-tilt'), dimEl=document.getElementById('kf-dimmer'), colorEl=document.getElementById('kf-color');
   if(panEl) panEl.oninput=(e)=>{ document.getElementById('kf-pan-val').textContent=e.target.value; };
   if(tiltEl) tiltEl.oninput=(e)=>{ document.getElementById('kf-tilt-val').textContent=e.target.value; };
@@ -1177,6 +1255,7 @@ function rebuild3DFixtures(){
 function update3DPreview(){
   if(!state.three.renderer) return;
   const pos = currentPlayhead();
+  const anySolo = state.patch.fixtures.some(f=>f.solo);
   state.patch.fixtures.forEach(f=>{
     const mesh = state.three.meshes[f.id]; if(!mesh) return;
     const clip = state.clips.list.find(c=>c.fixtureId===f.id && pos>=c.start && pos<=c.end);
@@ -1184,7 +1263,9 @@ function update3DPreview(){
     let val = {dimmer:100, colorHue:f.hue, pan:50, tilt:50};
     if(clip) val = {...val, ...evalClipAt(clip, pos-clip.start)};
     const color = new THREE.Color(hslToHex(val.colorHue??f.hue,75,55));
-    const dimAlpha = clamp((val.dimmer??100)/100, 0, 1);
+    const audible = !state.mixer.blackout && !f.muted && (!anySolo || f.solo);
+    const masterFactor = audible ? clamp(state.mixer.masterDimmer/100,0,1) : 0;
+    const dimAlpha = clamp((val.dimmer??100)/100, 0, 1) * masterFactor;
 
     if(mesh.kind==='pantilt'){
       const panRad = ((val.pan-50)/50) * (Math.PI*0.75);
@@ -1231,6 +1312,15 @@ async function importProject(file){
     if(data.beatOffset!=null) state.audio.beatOffset=data.beatOffset;
     renderTopbar(); renderTimeline(); rebuild3DFixtures();
   }catch(err){ alert('Fichier de projet invalide.'); }
+}
+function exportPatchCSV(){
+  document.getElementById('export-dropdown').classList.remove('open');
+  let csv = 'Nom;Marque;Modele;Univers;Adresse debut;Adresse fin;Mode;Nb canaux\n';
+  state.patch.fixtures.forEach(f=>{
+    const def=getFixtureDef(f.defId); const mode=def.modes[f.modeIndex]; const span=fixtureChannelSpan(f);
+    csv += `${f.name};${def.brand};${def.name};${f.universe};${span.start};${span.end};${mode.name};${mode.channels.length}\n`;
+  });
+  downloadBlob(csv, 'lumen-feuille-de-patch.csv', 'text/csv');
 }
 function exportMyDMX(){
   document.getElementById('export-dropdown').classList.remove('open');
