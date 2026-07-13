@@ -3,93 +3,89 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>LUMEN PRO — Visualiseur & Console</title>
+    <title>LUMEN PRO v3.0</title>
     <link rel="stylesheet" href="style.css">
+    <!-- Google Fonts pour le look "Console" -->
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;900&display=swap" rel="stylesheet">
 </head>
 <body>
 
-<div id="app-wrapper">
-    <header id="topbar">
-        <div class="logo">LUMEN <span>ENGINE</span></div>
+    <header id="main-header">
+        <div class="logo">LUMEN <span>v3.0</span></div>
+        
         <div class="transport">
-            <button id="btn-stop">STOP</button>
-            <button id="btn-play" class="active">PLAY</button>
-            <div id="timecode">00:00:00</div>
+            <button id="play-btn">PLAY</button>
+            <button id="stop-btn">STOP</button>
+            <div id="clock">00:00.00</div>
         </div>
-        <div class="spacer"></div>
-        <div class="file-ops">
-            <label for="audio-upload" class="btn-subtle">AUDIO</label>
-            <input type="file" id="audio-upload" hidden>
-            <button class="btn-primary" onclick="togglePanel('lib')">PATCH</button>
+
+        <div class="actions">
+            <label for="audio-input" class="btn-alt">AUDIO</label>
+            <input type="file" id="audio-input" hidden>
+            <button class="btn-main" id="patch-toggle">PATCH FIXTURE</button>
         </div>
     </header>
 
-    <main id="main-content">
+    <main id="editor">
+        <!-- Barre Latérale de Contrôle -->
         <aside id="inspector">
-            <div class="section-title">FIXTURE PROPERTIES</div>
-            <div id="ins-none" class="empty-msg">Aucune sélection</div>
-            <div id="ins-controls" style="display:none;">
-                <div class="fix-info">
-                    <strong id="ins-name">-</strong>
-                    <span id="ins-type">-</span>
+            <div class="panel-label">PARAMÈTRES FIXTURE</div>
+            <div id="inspector-ui" style="display:none;">
+                <h2 id="ins-name">NOM</h2>
+                <div class="fader">
+                    <label>DIMMER</label>
+                    <input type="range" id="f-dim" min="0" max="100" value="100">
                 </div>
-                
-                <div class="control-grid">
-                    <div class="fader-item">
-                        <label>DIM</label>
-                        <input type="range" id="f-dim" min="0" max="100">
-                    </div>
-                    <div class="fader-item">
-                        <label>PAN</label>
-                        <input type="range" id="f-pan" min="0" max="100">
-                    </div>
-                    <div class="fader-item">
-                        <label>TILT</label>
-                        <input type="range" id="f-tilt" min="0" max="100">
-                    </div>
+                <div class="fader">
+                    <label>PAN</label>
+                    <input type="range" id="f-pan" min="0" max="100" value="50">
                 </div>
-
-                <div class="color-section">
-                    <label>COLOR</label>
-                    <input type="color" id="f-color">
+                <div class="fader">
+                    <label>TILT</label>
+                    <input type="range" id="f-tilt" min="0" max="100" value="50">
                 </div>
-
-                <div class="fx-section">
-                    <button id="btn-fx-sine" class="btn-fx">AUTO-SINE FX</button>
+                <div class="fader">
+                    <label>COULEUR</label>
+                    <input type="color" id="f-color" value="#00ffff">
                 </div>
+                <button id="fx-sine-btn" class="fx-btn">SINE WAVE FX</button>
             </div>
+            <p id="ins-msg">Aucune sélection</p>
         </aside>
 
-        <section id="viewport-container">
-            <div id="render-canvas"></div>
-            <div class="viewport-ui">
-                <div class="badge">3D LIVE VIEW</div>
-                <div class="hint">ALT + DRAG : Rotation | CLIC : Sélection</div>
-            </div>
+        <!-- Visualiseur 3D -->
+        <section id="viewport">
+            <div id="three-canvas"></div>
+            <div class="vis-info">APERÇU 3D TEMPS RÉEL</div>
         </section>
     </main>
 
+    <!-- Timeline en bas -->
     <footer id="timeline">
-        <div class="tl-header">
-            <div class="tl-track-label">TRACKS</div>
-            <div id="tl-ruler"></div>
-        </div>
-        <div id="tl-body">
+        <div class="tl-sidebar">PISTES</div>
+        <div id="tl-grid">
             <div id="playhead"></div>
             <div id="tracks-list"></div>
         </div>
     </footer>
 
-    <div id="bottom-overlay">
-        <div class="overlay-header">
-            <span id="overlay-title">LIBRARY</span>
-            <button onclick="togglePanel(null)">CLOSE</button>
+    <!-- Overlay de Bibliothèque -->
+    <div id="patch-modal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>BIBLIOTHÈQUE FIXTURES</h3>
+                <button id="close-modal">✕</button>
+            </div>
+            <div class="lib-grid">
+                <div class="lib-item" onclick="addFixture('beam')"><strong>BEAM</strong> 16ch</div>
+                <div class="lib-item" onclick="addFixture('wash')"><strong>WASH</strong> 24ch</div>
+                <div class="lib-item" onclick="addFixture('spot')"><strong>SPOT</strong> 20ch</div>
+            </div>
         </div>
-        <div id="overlay-content"></div>
     </div>
-</div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-<script src="app.js"></script>
+    <!-- Librairies -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
